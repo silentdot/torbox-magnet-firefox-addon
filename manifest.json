@@ -3,6 +3,12 @@
   "name": "TorBox Magnet",
   "version": "1.0.0",
   "description": "Send magnet links directly to your TorBox account.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "torbox-magnet@dev",
+      "strict_min_version": "91.0"
+    }
+  },
   "icons": {
     "16": "icons/icon.svg",
     "32": "icons/icon.svg",

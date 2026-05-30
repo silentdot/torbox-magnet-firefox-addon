@@ -5,34 +5,64 @@
   <title>TorBox Magnet</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body data-theme="dark">
+<body>
   <div class="container">
+    <!-- ── Header ── -->
     <header class="header">
       <img src="../icons/icon.svg" alt="TorBox" class="logo">
       <h1 class="title">TorBox Magnet</h1>
-      <button id="theme-toggle" class="theme-btn" title="Toggle theme">
-        <span class="theme-icon">☀</span>
-      </button>
+      <div class="header-actions">
+        <button id="theme-toggle" class="icon-btn" title="Toggle theme">☀</button>
+        <button id="open-options" class="icon-btn" title="Options">⚙</button>
+      </div>
     </header>
 
+    <!-- ── API Status Bar (visible when key is set) ── -->
+    <div id="api-status-bar" class="section hidden">
+      <span class="status-dot disconnected"></span>
+      <span class="status-text" id="status-text">Checking API key…</span>
+      <button id="change-key-btn" class="section-action">Change</button>
+    </div>
+
+    <!-- ── API Key Form (hidden when key is valid) ── -->
     <div id="api-section" class="section">
       <label for="api-key" class="label">API Key</label>
       <input type="password" id="api-key" class="input" placeholder="Paste your TorBox API key">
-      <button id="save-key" class="btn btn-primary">Save Key</button>
+      <button id="save-key" class="btn btn-primary">Connect</button>
       <p id="key-status" class="status"></p>
     </div>
 
+    <!-- ── Action Section ── -->
     <div id="action-section" class="section hidden">
-      <p class="info">Current page: <span id="page-domain">—</span></p>
+      <p class="info">Page: <span id="page-domain">—</span></p>
       <button id="send-page" class="btn btn-primary">Send Page Magnet(s)</button>
       <p id="action-status" class="status"></p>
     </div>
 
+    <!-- ── History Section ── -->
+    <div id="history-wrapper" class="section hidden">
+      <div class="section-header">
+        <span class="section-title">History</span>
+        <div>
+          <button id="open-dashboard" class="section-action" title="Open TorBox dashboard">Dashboard</button>
+          <button id="clear-history" class="section-action" style="color: var(--error);">Clear</button>
+        </div>
+      </div>
+      <div id="history-section">
+        <div class="history-empty">No downloads yet.</div>
+      </div>
+    </div>
+
+    <!-- ── Footer Links ── -->
     <div class="links">
-      <a href="https://torbox.app/settings" target="_blank" class="link">Get API Key →</a>
-      <a href="#" id="open-options" class="link">Options</a>
+      <a href="https://torbox.app/settings" target="_blank" class="link">Get API Key</a>
+      <a href="https://torbox.app/dashboard" target="_blank" class="link">Dashboard</a>
     </div>
   </div>
+
+  <!-- ── Copy Toast ── -->
+  <div id="toast" class="toast">Copied!</div>
+
   <script src="popup.js"></script>
 </body>
 </html>

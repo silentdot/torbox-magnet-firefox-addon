@@ -31,7 +31,7 @@ export default {
     ],
     // Firefox preferences — search engine, start page, dev-friendly defaults
     pref: [
-      'browser.startup.homepage=https://1337x.to/popular-games',
+      'browser.startup.homepage=https://1337x.to/cat/Games/1/',
       'browser.startup.page=1',
       'browser.search.defaultenginename=DuckDuckGo',
       'browser.search.order.1=DuckDuckGo',
