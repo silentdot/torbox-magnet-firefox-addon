@@ -1,0 +1,5 @@
+node_modules/
+web-ext-artifacts/
+.dev-profile/
+*.zip
+package-lock.json

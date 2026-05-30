@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TorBox Magnet</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body data-theme="dark">
+  <div class="container">
+    <header class="header">
+      <img src="../icons/icon.svg" alt="TorBox" class="logo">
+      <h1 class="title">TorBox Magnet</h1>
+      <button id="theme-toggle" class="theme-btn" title="Toggle theme">
+        <span class="theme-icon">☀</span>
+      </button>
+    </header>
+
+    <div id="api-section" class="section">
+      <label for="api-key" class="label">API Key</label>
+      <input type="password" id="api-key" class="input" placeholder="Paste your TorBox API key">
+      <button id="save-key" class="btn btn-primary">Save Key</button>
+      <p id="key-status" class="status"></p>
+    </div>
+
+    <div id="action-section" class="section hidden">
+      <p class="info">Current page: <span id="page-domain">—</span></p>
+      <button id="send-page" class="btn btn-primary">Send Page Magnet(s)</button>
+      <p id="action-status" class="status"></p>
+    </div>
+
+    <div class="links">
+      <a href="https://torbox.app/settings" target="_blank" class="link">Get API Key →</a>
+      <a href="#" id="open-options" class="link">Options</a>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
