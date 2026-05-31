@@ -9,6 +9,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
+var MANIFEST_VERSION = '1.2.0';
 
 /* --- Init --- */
 browser.runtime.onInstalled.addListener(function () {
@@ -38,7 +39,26 @@ async function initKeyValidation() {
     var s = await validateApiKey(r.torbox_api_key);
     await browser.storage.local.set({ [API_STATUS_KEY]: { valid: s.valid, email: s.email, error: s.error, checkedAt: Date.now() } });
   }
+  checkForUpdate();
 }
+
+/* --- Periodic version check --- */
+async function checkForUpdate() {
+  try {
+    var res = await fetch('https://api.github.com/repos/silentdot/torbox-magnet-firefox-addon/releases/latest');
+    if (!res.ok) return;
+    var data = await res.json();
+    var latestVer = (data.tag_name || '').replace(/^v/i, '');
+    if (latestVer && latestVer !== MANIFEST_VERSION) {
+      var dlUrl = data.assets && data.assets[0] && data.assets[0].browser_download_url;
+      await browser.storage.local.set({
+        update_cache: { current: MANIFEST_VERSION, latest: latestVer, url: dlUrl || data.html_url, checkedAt: Date.now() }
+      });
+    }
+  } catch (e) {}
+}
+// Check every 6 hours
+setInterval(checkForUpdate, 21600000);
 
 /* --- Helpers for URL matching --- */
 function isMagnetUrl(url) { return url.startsWith('magnet:'); }
@@ -369,6 +389,11 @@ async function handleMessage(msg) {
     case 'open-dashboard':
       browser.tabs.create({ url: 'https://torbox.app/dashboard' });
       return { ok: true };
+
+    case 'check-update': {
+      var r = await browser.storage.local.get('update_cache');
+      return r.update_cache || { current: '', latest: null, url: null };
+    }
 
     default:
       return { error: 'Unknown message type: ' + msg.type };

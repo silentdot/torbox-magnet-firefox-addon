@@ -4,4 +4,6 @@ web-ext-artifacts/
 .dev-profile/
 *.zip
 package-lock.json
-*.xpi
+web-ext-artifacts/*.xpi
+.amo-upload-uuid
+!releases/

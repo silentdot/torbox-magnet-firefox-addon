@@ -150,13 +150,19 @@
             </button>
           </div>
           <label class="drawer-label">About</label>
-          <p class="drawer-about">TorBox Magnet v1.1.1</p>
+          <p class="drawer-about">TorBox Magnet v1.2.0</p>
           <p class="drawer-about-sub">Send magnet links directly to your TorBox account.</p>
         </div>
       </div>
     </div>
 
-    <div id="toast" class="toast"></div>
+    <div id="update-banner" class="update-banner hidden">
+      <span id="update-text">New version available</span>
+      <a id="update-link" href="#" target="_blank" class="ghost-btn" style="font-size:11px">Download</a>
+      <button id="update-dismiss" class="ghost-btn" style="font-size:11px;color:var(--text-muted)">Dismiss</button>
+    </div>
+
+        <div id="toast" class="toast"></div>
 
   </div>
   <script src="popup.js"></script>

@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Locate signed XPI
+        id: xpi
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          # Look for the signed xpi committed to releases/ directory
+          XPI=$(ls releases/torbox_magnet-${VER}.xpi 2>/dev/null | head -1)
+          if [ -z "$XPI" ]; then
+            # Fallback: any xpi in web-ext-artifacts
+            XPI=$(ls web-ext-artifacts/*.xpi 2>/dev/null | head -1)
+          fi
+          if [ -z "$XPI" ]; then
+            echo "ERROR: No signed .xpi found. Sign locally first: npm run sign"
+            exit 1
+          fi
+          echo "path=${XPI}" >> $GITHUB_OUTPUT
+          echo "name=$(basename ${XPI})" >> $GITHUB_OUTPUT
+
+      - name: Update update.json
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          XPI_NAME="${{ steps.xpi.outputs.name }}"
+          cat > update.json << EOF
+          {
+            "addons": {
+              "torbox-magnet@dev": {
+                "updates": [
+                  {
+                    "version": "${VER}",
+                    "update_link": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${XPI_NAME}"
+                  }
+                ]
+              }
+            }
+          }
+          EOF
+
+      - name: Commit update.json
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add update.json
+          git diff --cached --quiet || (git commit -m "auto: update update.json for ${GITHUB_REF_NAME}" && git push)
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: ${{ steps.xpi.outputs.path }}
+          generate_release_notes: true

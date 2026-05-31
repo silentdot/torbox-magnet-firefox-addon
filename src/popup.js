@@ -129,4 +129,21 @@ drawerChangeKey.addEventListener('click',function(){settingsDrawer.classList.add
 saveKeyBtn.addEventListener('click',saveApiKey);sendPageBtn.addEventListener('click',sendCurrentPageMagnets);
 apiInput.addEventListener('keydown',function(e){if(e.key==='Enter')saveApiKey();});
 function setStatus(el,text,type){el.innerHTML=text;el.className='status'+(type?' '+type:'');}
-(async function(){await initTheme();await initApiKey();})();
+(async function(){
+  await initTheme();
+  await initApiKey();
+  // Check for extension update
+  var uc = await browser.runtime.sendMessage({type:'check-update'});
+  if(uc && uc.latest && uc.latest !== uc.current){
+    var ban=document.getElementById('update-banner');
+    var txt=document.getElementById('update-text');
+    var link=document.getElementById('update-link');
+    var dim=document.getElementById('update-dismiss');
+    if(ban && txt && link){
+      txt.textContent='v'+uc.latest+' available';
+      if(uc.url) link.href=uc.url;
+      ban.classList.remove('hidden');
+      if(dim) dim.addEventListener('click',function(){ban.classList.add('hidden');});
+    }
+  }
+})();

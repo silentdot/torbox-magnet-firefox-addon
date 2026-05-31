@@ -1,6 +1,6 @@
 {
   "name": "torbox-magnet",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Send magnet links directly to your TorBox account.",
   "private": true,
   "scripts": {
@@ -8,7 +8,8 @@
     "dev:firefox-dev": "web-ext run --firefox=firefoxdeveloperedition",
     "build": "web-ext build",
     "lint": "web-ext lint",
-    "sign": "node scripts/sign.js"
+    "sign": "node scripts/sign.js",
+    "release": "node scripts/release.js"
   },
   "devDependencies": {
     "web-ext": "^8.3.0"
