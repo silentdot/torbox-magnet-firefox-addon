@@ -21,7 +21,8 @@
     "contextMenus",
     "notifications",
     "downloads",
-    "https://*.torbox.app/"
+    "https://*.torbox.app/",
+    "<all_urls>"
   ],
   "background": {
     "scripts": ["src/background.js"],
@@ -35,9 +36,5 @@
     "default_title": "TorBox Magnet",
     "default_popup": "src/popup.html",
     "browser_style": false
-  },
-  "options_ui": {
-    "page": "src/options.html",
-    "open_in_tab": false
   }
 }

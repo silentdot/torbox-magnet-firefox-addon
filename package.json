@@ -7,7 +7,8 @@
     "dev": "web-ext run",
     "dev:firefox-dev": "web-ext run --firefox=firefoxdeveloperedition",
     "build": "web-ext build",
-    "lint": "web-ext lint"
+    "lint": "web-ext lint",
+    "sign": "node scripts/sign.js"
   },
   "devDependencies": {
     "web-ext": "^8.3.0"
