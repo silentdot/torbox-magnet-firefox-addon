@@ -9,7 +9,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.2.0';
+var MANIFEST_VERSION = '1.2.1';
 
 /* --- Init --- */
 browser.runtime.onInstalled.addListener(function () {

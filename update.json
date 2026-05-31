@@ -3,8 +3,8 @@
     "torbox-magnet@dev": {
       "updates": [
         {
-          "version": "1.2.0",
-          "update_link": "https://github.com/silentdot/torbox-magnet-firefox-addon/releases/download/v1.2.0/torbox_magnet-1.2.0.xpi"
+          "version": "1.2.1",
+          "update_link": "https://github.com/silentdot/torbox-magnet-firefox-addon/releases/download/v1.2.1/torbox_magnet-1.2.1.xpi"
         }
       ]
     }
