@@ -89,7 +89,9 @@ var tag = 'v' + newVer;
 run('git add -A');
 run('git commit -m "' + tag + '"');
 run('git tag ' + tag);
-run('git push origin main --tags');
+// Determine default branch dynamically
+var branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: PROJECT, encoding: 'utf8' }).toString().trim();
+run('git push origin ' + branch + ' --tags');
 
 console.log('\n=== Done! v' + newVer + ' released. ===');
 console.log('GitHub Actions is creating the release...');

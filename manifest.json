@@ -7,7 +7,7 @@
     "gecko": {
       "id": "torbox-magnet@dev",
       "strict_min_version": "91.0",
-      "update_url": "https://raw.githubusercontent.com/silentdot/torbox-magnet-firefox-addon/main/update.json"
+      "update_url": "https://raw.githubusercontent.com/silentdot/torbox-magnet-firefox-addon/master/update.json"
     }
   },
   "icons": {
