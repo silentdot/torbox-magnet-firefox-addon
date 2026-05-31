@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "TorBox Magnet",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "description": "Send magnet links directly to your TorBox account.",
   "browser_specific_settings": {
     "gecko": {

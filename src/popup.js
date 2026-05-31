@@ -11,6 +11,7 @@ var toastEl = $('toast'), settingsToggle = $('settings-toggle'), settingsDrawer 
 var settingsClose = $('settings-close'), drawerEmail = $('drawer-email');
 var drawerThemeLabel = $('drawer-theme-label'), drawerThemeToggle = $('drawer-theme-toggle');
 var drawerChangeKey = $('drawer-change-key');
+var checkUpdateBtn = $('check-update-btn');
 
 function icon(n,s){var sz=s||14;return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" class="i"><use href="#i-'+n+'"/></svg>';}
 var FILE_ICONS = {archive:'archive',video:'video',audio:'audio',image:'image',doc:'doc',app:'app'};
@@ -133,7 +134,7 @@ settingsClose.addEventListener('click',function(){settingsDrawer.classList.add('
 var drawerScrim=settingsDrawer.querySelector('.drawer-scrim');if(drawerScrim)drawerScrim.addEventListener('click',function(){settingsDrawer.classList.add('hidden');});
 drawerThemeToggle.addEventListener('click',toggleTheme);
 drawerChangeKey.addEventListener('click',function(){settingsDrawer.classList.add('hidden');connectPanel.classList.remove('hidden');mainContent.classList.add('hidden');liveDot.classList.remove('live-dot--active');apiInput.value='';apiInput.focus();setStatus(keyStatus,'','');});
-saveKeyBtn.addEventListener('click',saveApiKey);sendPageBtn.addEventListener('click',sendCurrentPageMagnets);
+saveKeyBtn.addEventListener('click',saveApiKey);sendPageBtn.addEventListener('click',sendCurrentPageMagnets);checkUpdateBtn.addEventListener('click',async function(){checkUpdateBtn.textContent='Checking...';var r=await browser.runtime.sendMessage({type:'check-update-now'});checkUpdateBtn.textContent='Check for updates';if(r&&r.latest&&r.latest!==r.current){showToast('v'+r.latest+' available');var ban=$('update-banner');var txt=$('update-text');var link=$('update-link');if(ban&&txt){txt.textContent='v'+r.latest+' available';if(r.url)link.href=r.url;ban.classList.remove('hidden');}}else{showToast('Up to date');}});
 apiInput.addEventListener('keydown',function(e){if(e.key==='Enter')saveApiKey();});
 function setStatus(el,text,type){el.innerHTML=text;el.className='status'+(type?' '+type:'');}
 (async function(){

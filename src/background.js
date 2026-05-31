@@ -9,7 +9,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.2.2';
+var MANIFEST_VERSION = '1.2.4';
 
 /* --- Init --- */
 browser.runtime.onInstalled.addListener(function () {
@@ -43,17 +43,33 @@ async function initKeyValidation() {
 }
 
 /* --- Periodic version check --- */
+function semverGt(a, b) {
+  var aa = a.split('.').map(Number);
+  var bb = b.split('.').map(Number);
+  for (var i = 0; i < 3; i++) {
+    if ((aa[i] || 0) > (bb[i] || 0)) return true;
+    if ((aa[i] || 0) < (bb[i] || 0)) return false;
+  }
+  return false;
+}
+
 async function checkForUpdate() {
   try {
     var res = await fetch('https://api.github.com/repos/silentdot/torbox-magnet-firefox-addon/releases/latest');
     if (!res.ok) return;
     var data = await res.json();
     var latestVer = (data.tag_name || '').replace(/^v/i, '');
-    if (latestVer && latestVer !== MANIFEST_VERSION) {
-      var dlUrl = data.assets && data.assets[0] && data.assets[0].browser_download_url;
-      await browser.storage.local.set({
-        update_cache: { current: MANIFEST_VERSION, latest: latestVer, url: dlUrl || data.html_url, checkedAt: Date.now() }
-      });
+    if (latestVer) {
+      var isNewer = semverGt(latestVer, MANIFEST_VERSION);
+      if (isNewer) {
+        var dlUrl = data.assets && data.assets[0] && data.assets[0].browser_download_url;
+        await browser.storage.local.set({
+          update_cache: { current: MANIFEST_VERSION, latest: latestVer, url: dlUrl || data.html_url, checkedAt: Date.now() }
+        });
+      } else {
+        // Clear the banner when up to date
+        await browser.storage.local.set({ update_cache: { current: MANIFEST_VERSION, latest: null, url: null, checkedAt: Date.now() } });
+      }
     }
   } catch (e) {}
 }
@@ -403,6 +419,11 @@ async function handleMessage(msg) {
     case 'open-dashboard':
       browser.tabs.create({ url: 'https://torbox.app/dashboard' });
       return { ok: true };
+
+    case 'check-update-now':
+      await checkForUpdate();
+      var r2 = await browser.storage.local.get('update_cache');
+      return r2.update_cache || { current: '', latest: null, url: null };
 
     case 'check-update': {
       var r = await browser.storage.local.get('update_cache');

@@ -436,17 +436,13 @@ body {
 .update-banner {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 12px 10px;
-  padding: 8px 12px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  color: var(--warning);
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  border-color: var(--accent-dim);
+  background: rgba(4, 191, 138, 0.06);
 }
 .update-banner.hidden { display: none; }
-.update-banner #update-text { flex: 1; }
-.update-banner .ghost-btn { font-size: 11px; color: var(--warning); padding: 2px 6px; }
-.update-banner .ghost-btn:hover { background: rgba(245, 158, 11, 0.15); }
+.update-banner #update-text { flex: 1; font-weight: 600; color: var(--text); }
+.update-banner-icon { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
 }

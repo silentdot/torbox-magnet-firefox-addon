@@ -156,16 +156,20 @@
             </button>
           </div>
           <label class="drawer-label">About</label>
-          <p class="drawer-about">TorBox Magnet v1.2.2</p>
+          <p class="drawer-about">TorBox Magnet v1.2.4</p>
           <p class="drawer-about-sub">Send magnet links directly to your TorBox account.</p>
+          <button id="check-update-btn" class="ghost-btn" style="margin-top:10px;font-size:11px">Check for updates</button>
         </div>
       </div>
     </div>
 
-    <div id="update-banner" class="update-banner hidden">
+    <div id="update-banner" class="section update-banner hidden">
+      <svg width="14" height="14" viewBox="0 0 24 24" class="update-banner-icon"><use href="#i-download"/></svg>
       <span id="update-text">New version available</span>
-      <a id="update-link" href="#" target="_blank" class="ghost-btn" style="font-size:11px">Download</a>
-      <button id="update-dismiss" class="ghost-btn" style="font-size:11px;color:var(--text-muted)">Dismiss</button>
+      <a id="update-link" href="#" target="_blank" class="btn btn-primary btn--compact" style="width:auto;padding:3px 8px;font-size:11px;margin:0;flex-shrink:0">Update</a>
+      <button id="update-dismiss" title="Dismiss" style="background:none;border:none;cursor:pointer;padding:2px;flex-shrink:0;line-height:1;color:var(--text-muted);display:flex;align-items:center">
+        <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-close"/></svg>
+      </button>
     </div>
 
         <div id="toast" class="toast"></div>
