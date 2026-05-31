@@ -1,8 +1,8 @@
 /**
  * TorBox Magnet — Background Script
  *
- * Supports magnet URIs and .torrent file URLs via a single context menu item.
- * Flow: right-click link -> add to TorBox -> check cache -> download ZIP if cached
+ * Supports magnet URIs and .torrent file URLs.
+ * Two context menu modes: download immediately, or copy TorBox share link.
  */
 
 /* --- Constants --- */
@@ -14,20 +14,16 @@ var API_STATUS_KEY = 'torbox_api_status';
 browser.runtime.onInstalled.addListener(function () {
   browser.contextMenus.removeAll();
 
-  // Single menu item for all torrent-related links (magnet + .torrent).
-  // Shows on every link; the handler filters to only process magnet/.torrent URLs.
   browser.contextMenus.create({
-    id: 'send-to-torbox',
-    title: 'Send to TorBox',
+    id: 'send-dl',
+    title: 'Send to TorBox and start download',
     contexts: ['link']
   });
 
-  // Copy magnet — only on magnet links
   browser.contextMenus.create({
-    id: 'copy-magnet',
-    title: 'Copy magnet link',
-    contexts: ['link'],
-    targetUrlPatterns: ['magnet:*']
+    id: 'send-share',
+    title: 'Send to TorBox and copy share link',
+    contexts: ['link']
   });
 
   initKeyValidation();
@@ -44,35 +40,96 @@ async function initKeyValidation() {
   }
 }
 
-/* --- Context Menu Handler --- */
-browser.contextMenus.onClicked.addListener(async function (info) {
-  // Copy magnet handler
-  if (info.menuItemId === 'copy-magnet') {
-    try {
-      await browser.tabs.executeScript({
-        code: 'navigator.clipboard.writeText(' + JSON.stringify(info.linkUrl) + ');'
-      });
-    } catch (e) {
-      try {
-        await browser.tabs.executeScript({
-          code: '(function(){var ta=document.createElement("textarea");ta.value=' + JSON.stringify(info.linkUrl) + ';ta.style.position="fixed";ta.style.left="-9999px";document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();})();'
-        });
-      } catch (e2) {
-        notify('Copy Failed', 'Could not copy the link.');
-      }
-    }
-    return;
+/* --- Helpers for URL matching --- */
+function isMagnetUrl(url) { return url.startsWith('magnet:'); }
+function isTorrentUrl(url) { return !isMagnetUrl(url) && url.match(/\.torrent($|[?#&])/i); }
+
+/* --- Core: send to TorBox, returns {torrentId, name, hash}.
+     If the torrent already exists on TorBox, createtorrent may error.
+     In that case we still return the info we can extract from the URL. --- */
+async function sendToTorbox(url, apiKey) {
+  var hash = '';
+  var name = '';
+
+  if (isMagnetUrl(url)) {
+    hash = extractHash(url);
+    name = extractNameFromMagnet(url) || 'Unknown';
+  } else {
+    name = extractFilename(url).replace(/\.torrent($|[?#&])/i, '') || 'Unknown';
   }
 
-  if (info.menuItemId !== 'send-to-torbox') return;
+  try {
+    var formData = new FormData();
+    formData.append('allow_zip', 'true');
+
+    if (isMagnetUrl(url)) {
+      formData.append('magnet', url);
+    } else {
+      var fileRes = await fetch(url);
+      if (!fileRes.ok) throw new Error('Failed to fetch .torrent (HTTP ' + fileRes.status + ')');
+      var blob = await fileRes.blob();
+      formData.append('file', blob, extractFilename(url) || 'torrent.torrent');
+    }
+
+    var res = await fetch(API_BASE + '/torrents/createtorrent', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      body: formData
+    });
+    var data = await res.json();
+
+    if (res.ok && data.success !== false) {
+      var torrentId = data.data && (data.data.torrent_id || data.data.id);
+      if (data.data && data.data.name) name = data.data.name;
+      if (data.data && data.data.hash) hash = data.data.hash;
+      return { torrentId: torrentId, name: name, hash: hash };
+    }
+  } catch (e) {
+    // createtorrent failed — torrent likely already exists
+    console.warn('TorBox Magnet: createtorrent failed (may already exist)', e.message);
+  }
+
+  // Return what we extracted from the URL even if the API call failed
+  return { torrentId: null, name: name, hash: hash };
+}
+
+/* --- Build TorBox share link --- */
+function buildShareLink(torrentId, hash) {
+  if (hash) return 'https://torbox.app/torrent/' + hash.toLowerCase();
+  if (torrentId) return 'https://torbox.app/torrent/' + torrentId;
+  return '';
+}
+
+/* --- Copy text to clipboard from background --- */
+async function copyToClipboard(text) {
+  try {
+    await browser.tabs.executeScript({
+      code: 'navigator.clipboard.writeText(' + JSON.stringify(text) + ');'
+    });
+  } catch (e) {
+    try {
+      await browser.tabs.executeScript({
+        code: '(function(){var ta=document.createElement("textarea");ta.value=' + JSON.stringify(text) + ';ta.style.position="fixed";ta.style.left="-9999px";document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();})();'
+      });
+    } catch (e2) {
+      throw new Error('Clipboard write failed');
+    }
+  }
+}
+
+/* --- Context Menu Handler --- */
+browser.contextMenus.onClicked.addListener(async function (info) {
+  if (info.menuItemId !== 'send-dl' && info.menuItemId !== 'send-share') return;
 
   var url = info.linkUrl;
+  if (!isMagnetUrl(url) && !isTorrentUrl(url)) return;
 
-  // Only process magnet URIs and URLs pointing to .torrent files.
-  // Catches: file.torrent, file.torrent?query, file.torrent#hash
-  var isMagnet = url.startsWith('magnet:');
-  var isTorrent = !isMagnet && url.match(/\.torrent($|[?#&])/i);
-  if (!isMagnet && !isTorrent) return;
+  // History entry builder
+  function saveHistory(cached, extra) {
+    var entry = { magnet: url, name: rName, torrentId: rId, hash: rHash, cached: cached, fileType: 'other' };
+    if (extra) for (var k in extra) entry[k] = extra[k];
+    addHistory(entry);
+  }
 
   var r = await browser.storage.local.get('torbox_api_key');
   if (!r.torbox_api_key) {
@@ -82,52 +139,45 @@ browser.contextMenus.onClicked.addListener(async function (info) {
   var apiKey = r.torbox_api_key;
 
   try {
-    notify('TorBox', 'Sending\u2026');
+    notify('TorBox', 'Processing\u2026');
 
-    var formData = new FormData();
-    formData.append('allow_zip', 'true');
-    var hash = '';
-    var name = '';
+    var result = await sendToTorbox(url, apiKey);
+    var rId = result.torrentId, rName = result.name, rHash = result.hash;
 
-    if (isMagnet) {
-      formData.append('magnet', url);
-      hash = extractHash(url);
-      name = extractNameFromMagnet(url) || 'Unknown';
-    } else {
-      // Fetch the .torrent file and submit it
-      var fileRes = await fetch(url);
-      if (!fileRes.ok) throw new Error('Failed to fetch .torrent (HTTP ' + fileRes.status + ')');
-      var blob = await fileRes.blob();
-      formData.append('file', blob, extractFilename(url) || 'torrent.torrent');
-      name = extractFilename(url).replace(/\.torrent($|[?#&])/i, '') || 'Unknown';
+    if (info.menuItemId === 'send-share') {
+      // Build the TorBox share link and copy it.
+      // rHash is always populated for magnets (extracted from URL).
+      // For .torrent files, it depends on the API response.
+      var shareLink = buildShareLink(rId, rHash);
+      if (!shareLink && isMagnetUrl(url) && rHash) {
+        shareLink = 'https://torbox.app/torrent/' + rHash;
+      }
+      if (!shareLink) {
+        notify('Share Link', 'Torrent added. Open dashboard to find the share link.');
+        return;
+      }
+      try {
+        await copyToClipboard(shareLink);
+        if (rHash) await addHistory({ magnet: url, hash: rHash, name: rName, torrentId: rId, cached: false, fileType: 'other' });
+        notify('Share Link Copied', shareLink);
+      } catch (e) {
+        notify('Share Link', shareLink);
+      }
+      return;
     }
 
-    var createRes = await fetch(API_BASE + '/torrents/createtorrent', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey },
-      body: formData
-    });
-
-    var createData = await createRes.json();
-    if (!createRes.ok || createData.success === false) {
-      throw new Error(createData.detail || createData.error || 'HTTP ' + createRes.status);
-    }
-
-    var torrentId = createData.data && (createData.data.torrent_id || createData.data.id);
-    if (createData.data && createData.data.name) name = createData.data.name;
-    if (!hash && createData.data && createData.data.hash) hash = createData.data.hash;
-
-    if (hash) {
-      var cachedInfo = await checkCache(hash, apiKey);
-      if (cachedInfo.cached && torrentId) {
-        var needsZip = needsZipWrap(cachedInfo.files, name);
-        await downloadCachedZip(torrentId, apiKey, name, url, hash, needsZip);
+    // send-dl: download if cached, queue otherwise
+    if (rHash) {
+      var cachedInfo = await checkCache(rHash, apiKey);
+      if (cachedInfo.cached && rId) {
+        var needsZip = needsZipWrap(cachedInfo.files, rName);
+        await downloadCachedZip(rId, apiKey, rName, url, rHash, needsZip);
         return;
       }
     }
 
-    await addHistory({ magnet: url, hash: hash, name: name, torrentId: torrentId, cached: false, fileType: 'other' });
-    notify('Added to TorBox', '"' + (name !== 'Unknown' ? name : 'Torrent') + '" has been added and queued.');
+    saveHistory(false);
+    notify('Added to TorBox', '"' + rName + '" has been added and queued.');
 
   } catch (err) {
     console.error('TorBox Magnet error:', err);
@@ -152,7 +202,6 @@ async function checkCache(hash, apiKey) {
       data.data[hashUpper] || data.data[hash] || data.data[hash.toLowerCase()]
     );
     if (!info) return { cached: false, files: [] };
-
     var files = [];
     if (Array.isArray(info.files)) {
       for (var i = 0; i < info.files.length; i++) {
@@ -161,7 +210,6 @@ async function checkCache(hash, apiKey) {
     }
     return { cached: true, files: files };
   } catch (e) {
-    console.warn('TorBox Magnet: cache check failed', e);
     return { cached: false, files: [] };
   }
 }
@@ -187,17 +235,16 @@ async function downloadCachedZip(torrentId, apiKey, name, url, hash, zipWrap) {
   } else {
     try {
       var body = await dlRes.json();
-      var url2 = body && body.data && body.data.url;
-      if (url2) browser.downloads.download({ url: url2, filename: filename });
+      var downloadUrl = body && body.data && body.data.url;
+      if (downloadUrl) browser.downloads.download({ url: downloadUrl, filename: filename });
       else browser.tabs.create({ url: dlUrl });
     } catch (e) {
       browser.tabs.create({ url: dlUrl });
     }
   }
 
-  await addHistory({ magnet: url, hash: hash, name: name, torrentId: torrentId, cached: true });
-  var msg = zipWrap ? 'ZIP download started for "' + name + '".' : 'Download started for "' + name + '".';
-  notify('Download Starting', msg);
+  await addHistory({ magnet: url, hash: hash, name: name, torrentId: torrentId, cached: true, fileType: 'other' });
+  notify('Download Starting', (zipWrap ? 'ZIP ' : '') + 'Download started for "' + name + '".');
 }
 
 /* --- History --- */
@@ -250,18 +297,23 @@ browser.runtime.onMessage.addListener(function (msg, sender) {
 
 async function handleMessage(msg) {
   switch (msg.type) {
+
     case 'get-history':
       return { history: await getHistory() };
+
     case 'clear-history':
       await clearHistory();
       return { ok: true };
+
     case 'delete-history-entry':
       await removeHistoryEntry(msg.hash);
       return { ok: true };
+
     case 'get-apikey-status': {
       var s = await browser.storage.local.get(API_STATUS_KEY);
       return s[API_STATUS_KEY] || { valid: false, error: 'Not checked' };
     }
+
     case 'validate-apikey': {
       var result = await validateApiKey(msg.apiKey);
       var s = {};
@@ -269,15 +321,55 @@ async function handleMessage(msg) {
       await browser.storage.local.set(s);
       return result;
     }
+
     case 're-download': {
       var r = await browser.storage.local.get('torbox_api_key');
       if (!r.torbox_api_key) return { ok: false, error: 'No API key' };
       await downloadCachedZip(msg.torrentId, r.torbox_api_key, msg.name, '', '', true);
       return { ok: true };
     }
+
+    case 'copy-share-link': {
+      var link = buildShareLink(msg.torrentId, msg.hash);
+      if (!link) return { ok: false, error: 'No share link available' };
+      try { await copyToClipboard(link); return { ok: true, link: link }; }
+      catch (e) { return { ok: false, error: e.message }; }
+    }
+
+    case 'send-page-magnets': {
+      // Process multiple URLs: send + download cached ones
+      var r = await browser.storage.local.get('torbox_api_key');
+      if (!r.torbox_api_key) return { ok: false, error: 'No API key' };
+      var apiKey = r.torbox_api_key;
+      var results = [];
+      for (var i = 0; i < msg.urls.length; i++) {
+        var url = msg.urls[i];
+        try {
+          var result = await sendToTorbox(url, apiKey);
+          var cached = false;
+          if (result.hash) {
+            var ci = await checkCache(result.hash, apiKey);
+            cached = ci.cached;
+            if (cached && result.torrentId) {
+              var nz = needsZipWrap(ci.files, result.name);
+              await downloadCachedZip(result.torrentId, apiKey, result.name, url, result.hash, nz);
+              results.push({ url: url, status: 'downloaded', name: result.name });
+              continue;
+            }
+          }
+          await addHistory({ magnet: url, hash: result.hash, name: result.name, torrentId: result.torrentId, cached: false, fileType: 'other' });
+          results.push({ url: url, status: 'queued', name: result.name });
+        } catch (err) {
+          results.push({ url: url, status: 'error', error: err.message });
+        }
+      }
+      return { ok: true, results: results };
+    }
+
     case 'open-dashboard':
       browser.tabs.create({ url: 'https://torbox.app/dashboard' });
       return { ok: true };
+
     default:
       return { error: 'Unknown message type: ' + msg.type };
   }
