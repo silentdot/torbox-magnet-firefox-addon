@@ -6,7 +6,7 @@ function $(id) { return document.getElementById(id); }
 var liveDot = $('live-dot'), mainContent = $('main-content'), connectPanel = $('connect-panel');
 var apiInput = $('api-key'), saveKeyBtn = $('save-key'), keyStatus = $('key-status');
 var pageDomain = $('page-domain'), sendPageBtn = $('send-page'), actionStatus = $('action-status');
-var historyEl = $('history-section'), clearHistBtn = $('clear-history'), dashboardBtn = $('open-dashboard');
+var historyEl = $('history-section'), clearHistBtn = $('clear-history'), refreshHistBtn = $('refresh-history'), dashboardBtn = $('open-dashboard');
 var toastEl = $('toast'), settingsToggle = $('settings-toggle'), settingsDrawer = $('settings-drawer');
 var settingsClose = $('settings-close'), drawerEmail = $('drawer-email');
 var drawerThemeLabel = $('drawer-theme-label'), drawerThemeToggle = $('drawer-theme-toggle');
@@ -120,6 +120,13 @@ historyEl.addEventListener('click',async function(e){
 });
 
 clearHistBtn.addEventListener('click',async function(){await browser.runtime.sendMessage({type:'clear-history'});await loadHistory();});
+refreshHistBtn.addEventListener('click',async function(){
+  if(refreshHistBtn.disabled)return;
+  refreshHistBtn.disabled=true;
+  var r=await browser.runtime.sendMessage({type:'refresh-history-cache'});
+  refreshHistBtn.disabled=false;
+  if(r.history)loadHistory();
+});
 dashboardBtn.addEventListener('click',function(){browser.runtime.sendMessage({type:'open-dashboard'});});
 settingsToggle.addEventListener('click',function(){settingsDrawer.classList.remove('hidden');});
 settingsClose.addEventListener('click',function(){settingsDrawer.classList.add('hidden');});

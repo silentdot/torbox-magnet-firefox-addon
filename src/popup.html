@@ -62,6 +62,9 @@
         <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>
         </symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </symbol>
       </defs>
     </svg>
 
@@ -100,6 +103,9 @@
             <button id="open-dashboard" class="ghost-btn" title="Open TorBox dashboard">
               <svg width="12" height="12" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:3px"><use href="#i-grid"/></svg>
               Dashboard
+            </button>
+            <button id="refresh-history" class="icon-btn icon-btn--sm" title="Refresh queued cache status">
+              <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-refresh"/></svg>
             </button>
             <button id="clear-history" class="ghost-btn ghost-btn--danger" title="Clear history">
               <svg width="12" height="12" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:3px"><use href="#i-trash"/></svg>
@@ -150,7 +156,7 @@
             </button>
           </div>
           <label class="drawer-label">About</label>
-          <p class="drawer-about">TorBox Magnet v1.2.1</p>
+          <p class="drawer-about">TorBox Magnet v1.2.2</p>
           <p class="drawer-about-sub">Send magnet links directly to your TorBox account.</p>
         </div>
       </div>

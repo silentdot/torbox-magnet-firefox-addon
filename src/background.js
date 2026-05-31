@@ -9,7 +9,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.2.1';
+var MANIFEST_VERSION = '1.2.2';
 
 /* --- Init --- */
 browser.runtime.onInstalled.addListener(function () {
@@ -328,6 +328,20 @@ async function handleMessage(msg) {
     case 'delete-history-entry':
       await removeHistoryEntry(msg.hash);
       return { ok: true };
+
+    case 'refresh-history-cache': {
+      var history = await getHistory();
+      var r2 = await browser.storage.local.get('torbox_api_key');
+      if (!r2.torbox_api_key) return { ok: false, error: 'No API key' };
+      for (var i = 0; i < history.length; i++) {
+        if (!history[i].cached && history[i].hash) {
+          var ci = await checkCache(history[i].hash, r2.torbox_api_key);
+          if (ci.cached) history[i].cached = true;
+        }
+      }
+      await browser.storage.local.set({ [HISTORY_KEY]: history });
+      return { history: history };
+    }
 
     case 'get-apikey-status': {
       var s = await browser.storage.local.get(API_STATUS_KEY);
