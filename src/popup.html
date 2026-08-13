@@ -19,9 +19,6 @@
         <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
         </symbol>
-        <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-        </symbol>
         <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
         </symbol>
@@ -46,9 +43,6 @@
         <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
         </symbol>
-        <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10.3 3.7 2.2 17.2A2 2 0 0 0 3.9 20h16.2a2 2 0 0 0 1.7-2.8L13.7 3.7a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-        </symbol>
       </defs>
     </svg>
 
@@ -59,6 +53,9 @@
       </div>
       <div class="header-actions">
         <button id="connection-alert" class="connection-alert hidden" type="button">Reconnect</button>
+        <button id="open-dashboard-top" class="icon-button" type="button" aria-label="Open TorBox dashboard" title="TorBox dashboard">
+          <svg width="17" height="17" aria-hidden="true"><use href="#i-grid"/></svg>
+        </button>
         <button id="settings-toggle" class="icon-button" type="button" aria-label="Open settings" aria-controls="settings-menu" aria-expanded="false" title="Settings">
           <svg width="17" height="17" aria-hidden="true"><use href="#i-gear"/></svg>
         </button>
@@ -90,7 +87,7 @@
         </div>
         <p class="eyebrow">Private connection</p>
         <h2 id="setup-title">Connect to TorBox</h2>
-        <p id="setup-description" class="setup-description">Send magnets from any page directly to your TorBox account.</p>
+        <p id="setup-description" class="setup-description">Right-click a magnet or .torrent link to send it to TorBox and start the download.</p>
         <label class="input-label" for="api-key">TorBox API key</label>
         <input type="password" id="api-key" class="input" placeholder="Paste your API key" autocomplete="off" spellcheck="false">
         <p class="input-hint">Find it in <a href="https://torbox.app/settings" target="_blank" rel="noreferrer">TorBox settings</a>. Your key stays on this device.</p>
@@ -99,47 +96,14 @@
       </section>
 
       <div id="main-content" class="view main-view hidden">
-        <section class="action-panel glass-panel" aria-labelledby="current-page-label">
-          <div id="action-workflow">
-            <div class="page-context">
-              <div>
-                <p id="current-page-label" class="eyebrow">Current page</p>
-                <p id="page-domain" class="page-domain">Checking page...</p>
-              </div>
-              <span id="magnet-count" class="count-label">Scanning</span>
-            </div>
-            <button id="send-page" class="button button-primary send-button" type="button" disabled>
-              <span id="send-button-spinner" class="spinner spinner-on-button" aria-hidden="true"></span>
-              <svg id="send-button-icon" width="17" height="17" aria-hidden="true"><use href="#i-send"/></svg>
-              <span id="send-button-label">Scanning page...</span>
-            </button>
-            <p id="scan-message" class="scan-message hidden"></p>
-            <button id="rescan-page" class="text-button centered hidden" type="button">
-              <svg width="13" height="13" aria-hidden="true"><use href="#i-refresh"/></svg>
-              Rescan page
-            </button>
-          </div>
-
-          <div id="action-result" class="action-outcome hidden" aria-live="polite">
-            <span class="outcome-icon outcome-icon-success" aria-hidden="true">
-              <svg width="20" height="20"><use href="#i-check"/></svg>
-            </span>
-            <div class="outcome-copy">
-              <h2 id="result-title">Sent to TorBox</h2>
-              <p id="result-detail"></p>
-            </div>
-            <button id="scan-again" class="secondary-button" type="button">Scan again</button>
-          </div>
-
-          <div id="action-error" class="action-outcome hidden" role="alert">
-            <span class="outcome-icon outcome-icon-error" aria-hidden="true">
-              <svg width="20" height="20"><use href="#i-alert"/></svg>
-            </span>
-            <div class="outcome-copy">
-              <h2>Nothing was sent</h2>
-              <p id="action-error-detail">TorBox could not process these magnets.</p>
-            </div>
-            <button id="retry-send" class="secondary-button" type="button">Retry</button>
+        <section class="workflow-panel glass-panel" aria-labelledby="workflow-heading">
+          <span class="workflow-icon" aria-hidden="true">
+            <svg width="19" height="19"><use href="#i-download"/></svg>
+          </span>
+          <div>
+            <p class="eyebrow">Quick download</p>
+            <h2 id="workflow-heading">Right-click a magnet or .torrent link</h2>
+            <p class="workflow-description">Choose &quot;Send to TorBox and start download&quot; for a magnet link or .torrent file.</p>
           </div>
         </section>
 
@@ -154,24 +118,6 @@
           <div id="recent-history" class="history-list" aria-live="polite"></div>
         </section>
       </div>
-
-      <section id="magnet-picker" class="view focused-view hidden" aria-labelledby="picker-title">
-        <div class="focused-header">
-          <button id="picker-back" class="icon-button icon-button-plain" type="button" aria-label="Back to main view" title="Back">
-            <svg width="17" height="17" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-          </button>
-          <div>
-            <p class="eyebrow">Current page</p>
-            <h2 id="picker-title">Choose magnets</h2>
-          </div>
-          <button id="picker-select-all" class="text-button" type="button">Clear all</button>
-        </div>
-        <p class="focused-description">Select what you want to send. All magnets are selected by default.</p>
-        <div id="magnet-list" class="magnet-list"></div>
-        <div class="focused-footer">
-          <button id="send-selected" class="button button-primary" type="button">Send selected</button>
-        </div>
-      </section>
 
       <section id="history-view" class="view focused-view hidden" aria-labelledby="history-title">
         <div class="focused-header">

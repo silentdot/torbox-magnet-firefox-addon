@@ -1,5 +1,6 @@
 var API_KEY = 'torbox_api_key';
 var RECENT_HISTORY_LIMIT = 3;
+var DOWNLOAD_API_BASE = 'https://api.torbox.app/v1/api/torrents/requestdl';
 
 function $(id) { return document.getElementById(id); }
 function createIcon(name, size) {
@@ -24,19 +25,14 @@ function createElement(tagName, className, text) {
 var state = {
   connected: false,
   email: '',
-  magnets: [],
+  apiKey: '',
   history: [],
-  failedUrls: [],
-  scanning: false,
-  scanFailed: false,
-  sending: false,
   activeView: 'loading'
 };
 
 var appLoading = $('app-loading');
 var mainContent = $('main-content');
 var connectPanel = $('connect-panel');
-var magnetPicker = $('magnet-picker');
 var historyView = $('history-view');
 var setupBack = $('setup-back');
 var setupTitle = $('setup-title');
@@ -45,27 +41,10 @@ var apiInput = $('api-key');
 var saveKeyButton = $('save-key');
 var keyStatus = $('key-status');
 var connectionAlert = $('connection-alert');
-var pageDomain = $('page-domain');
-var magnetCount = $('magnet-count');
-var sendPageButton = $('send-page');
-var sendButtonLabel = $('send-button-label');
-var sendButtonIcon = $('send-button-icon');
-var sendButtonSpinner = $('send-button-spinner');
-var scanMessage = $('scan-message');
-var rescanButton = $('rescan-page');
-var actionWorkflow = $('action-workflow');
-var actionResult = $('action-result');
-var actionError = $('action-error');
-var resultTitle = $('result-title');
-var resultDetail = $('result-detail');
-var actionErrorDetail = $('action-error-detail');
 var recentHistory = $('recent-history');
 var fullHistory = $('full-history');
 var viewAllHistory = $('view-all-history');
 var historyCount = $('history-count');
-var magnetList = $('magnet-list');
-var sendSelectedButton = $('send-selected');
-var selectAllButton = $('picker-select-all');
 var settingsToggle = $('settings-toggle');
 var settingsMenu = $('settings-menu');
 var settingsAccountLabel = $('settings-account-label');
@@ -88,7 +67,6 @@ function showView(name) {
   appLoading.classList.toggle('hidden', name !== 'loading');
   mainContent.classList.toggle('hidden', name !== 'main');
   connectPanel.classList.toggle('hidden', name !== 'connect');
-  magnetPicker.classList.toggle('hidden', name !== 'picker');
   historyView.classList.toggle('hidden', name !== 'history');
   closeSettings(false);
 }
@@ -112,12 +90,37 @@ function setKeyStatus(message, isError) {
   keyStatus.className = 'form-status' + (isError ? ' error' : '');
 }
 
+function buildDownloadLink(torrentId, apiKey, zipWrap) {
+  if (!torrentId || !apiKey) return '';
+  return DOWNLOAD_API_BASE + '?token=' + encodeURIComponent(apiKey) +
+    '&torrent_id=' + encodeURIComponent(torrentId) +
+    '&zip_link=' + (zipWrap ? 'true' : 'false') +
+    '&redirect=true&append_name=true';
+}
+
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+
+  var textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  var copied = document.execCommand('copy');
+  textarea.remove();
+  return copied ? Promise.resolve() : Promise.reject(new Error('Clipboard write failed'));
+}
+
 function showSetup(isAccountChange, message) {
   setupBack.classList.toggle('hidden', !isAccountChange);
   setupTitle.textContent = isAccountChange ? 'Update connection' : 'Connect to TorBox';
   setupDescription.textContent = isAccountChange
     ? 'Enter a different API key to change the TorBox account used by this extension.'
-    : 'Send magnets from any page directly to your TorBox account.';
+    : 'Right-click a magnet or .torrent link to send it to TorBox and start the download.';
   saveKeyButton.textContent = isAccountChange ? 'Save connection' : 'Connect account';
   apiInput.value = '';
   setKeyStatus(message || '', Boolean(message));
@@ -127,6 +130,7 @@ function showSetup(isAccountChange, message) {
 
 async function initialiseApiKey() {
   var key = await getStored(API_KEY);
+  state.apiKey = key || '';
   if (!key) {
     showSetup(false);
     return;
@@ -154,7 +158,6 @@ function showConnected(email) {
   settingsAccountLabel.textContent = email;
   connectionAlert.classList.add('hidden');
   showView('main');
-  scanCurrentPage();
   loadHistory().then(refreshHistoryInBackground);
 }
 
@@ -175,6 +178,7 @@ async function saveApiKey() {
       return;
     }
     await setStored(API_KEY, key);
+    state.apiKey = key;
     setKeyStatus('', false);
     showConnected(result.email || 'Connected');
     showToast('TorBox connected');
@@ -184,218 +188,6 @@ async function saveApiKey() {
     saveKeyButton.disabled = false;
     saveKeyButton.textContent = state.connected ? 'Save connection' : 'Connect account';
   }
-}
-
-function getMagnetName(url, anchorLabel, index) {
-  try {
-    var parsed = new URL(url);
-    var displayName = parsed.searchParams.get('dn');
-    if (displayName) return displayName;
-  } catch (error) {}
-  if (anchorLabel && anchorLabel.length > 1 && anchorLabel.length < 140) return anchorLabel;
-  return 'Magnet ' + (index + 1);
-}
-
-function getMagnetHash(url) {
-  var match = url.match(/btih:([a-fA-F0-9]{40}|[a-fA-F0-9]{64}|[A-Z2-7]{32})/);
-  return match ? match[1].toLowerCase() : url.slice(0, 54);
-}
-
-async function scanCurrentPage() {
-  if (state.scanning) return;
-  state.scanning = true;
-  state.scanFailed = false;
-  showActionWorkflow();
-  renderScanState();
-  focusSoon(sendPageButton);
-
-  try {
-    var tabs = await browser.tabs.query({ active: true, currentWindow: true });
-    var tab = tabs[0];
-    if (!tab) throw new Error('No active page');
-
-    if (tab.url) {
-      try {
-        pageDomain.textContent = new URL(tab.url).hostname || 'Current page';
-      } catch (error) {
-        pageDomain.textContent = 'Current page';
-      }
-    }
-
-    var results = await browser.tabs.executeScript(tab.id, {
-      code: 'Array.from(document.querySelectorAll(\'a[href^="magnet:"]\')).map(function(a){return {url:a.href,label:(a.textContent||"").trim()};})'
-    });
-    var found = results[0] || [];
-    var seen = {};
-    state.magnets = [];
-    for (var i = 0; i < found.length; i++) {
-      if (!found[i].url || seen[found[i].url]) continue;
-      seen[found[i].url] = true;
-      state.magnets.push({
-        url: found[i].url,
-        name: getMagnetName(found[i].url, found[i].label, state.magnets.length),
-        hash: getMagnetHash(found[i].url)
-      });
-    }
-  } catch (error) {
-    state.magnets = [];
-    state.scanFailed = true;
-    pageDomain.textContent = 'This page cannot be scanned';
-  } finally {
-    state.scanning = false;
-    renderScanState();
-    if (state.activeView === 'main') {
-      focusSoon(state.magnets.length === 0 ? rescanButton : sendPageButton);
-    }
-  }
-}
-
-function renderScanState() {
-  var count = state.magnets.length;
-  sendButtonSpinner.classList.toggle('hidden', !state.scanning);
-  sendButtonIcon.classList.toggle('hidden', state.scanning);
-  rescanButton.classList.toggle('hidden', state.scanning || count > 0);
-  scanMessage.classList.toggle('hidden', state.scanning || count > 0);
-
-  if (state.scanning) {
-    magnetCount.textContent = 'Scanning';
-    sendButtonLabel.textContent = 'Scanning page...';
-    sendPageButton.disabled = false;
-    sendPageButton.setAttribute('aria-disabled', 'true');
-    return;
-  }
-
-  if (count === 0) {
-    magnetCount.textContent = 'None found';
-    sendButtonLabel.textContent = 'No magnets found';
-    scanMessage.textContent = state.scanFailed
-      ? 'Firefox could not scan this page. Try again or open a different page.'
-      : 'This page does not contain any magnet links.';
-    sendPageButton.disabled = true;
-    sendPageButton.removeAttribute('aria-disabled');
-    return;
-  }
-
-  magnetCount.textContent = count + (count === 1 ? ' magnet' : ' magnets');
-  sendButtonLabel.textContent = count === 1 ? 'Send magnet' : 'Choose ' + count + ' magnets';
-  sendPageButton.disabled = false;
-  sendPageButton.removeAttribute('aria-disabled');
-}
-
-function showActionWorkflow() {
-  actionWorkflow.classList.remove('hidden');
-  actionResult.classList.add('hidden');
-  actionError.classList.add('hidden');
-}
-
-function showMagnetPicker() {
-  magnetList.replaceChildren();
-  for (var i = 0; i < state.magnets.length; i++) {
-    var magnet = state.magnets[i];
-    var choice = createElement('label', 'magnet-choice');
-    var checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.value = String(i);
-    checkbox.checked = true;
-    var copy = createElement('span', 'magnet-choice-copy');
-    var name = createElement('span', 'magnet-choice-name', magnet.name);
-    name.title = magnet.name;
-    copy.appendChild(name);
-    copy.appendChild(createElement('span', 'magnet-choice-detail', magnet.hash));
-    choice.appendChild(checkbox);
-    choice.appendChild(copy);
-    magnetList.appendChild(choice);
-  }
-  updatePickerControls();
-  showView('picker');
-  focusSoon($('picker-back'));
-}
-
-function selectedMagnets() {
-  var checked = magnetList.querySelectorAll('input:checked');
-  var selected = [];
-  for (var i = 0; i < checked.length; i++) {
-    selected.push(state.magnets[Number(checked[i].value)]);
-  }
-  return selected;
-}
-
-function updatePickerControls() {
-  var selectedCount = magnetList.querySelectorAll('input:checked').length;
-  var allSelected = selectedCount === state.magnets.length;
-  selectAllButton.textContent = allSelected ? 'Clear all' : 'Select all';
-  sendSelectedButton.disabled = selectedCount === 0;
-  sendSelectedButton.textContent = selectedCount === 0
-    ? 'Select at least one'
-    : 'Send ' + selectedCount + (selectedCount === 1 ? ' magnet' : ' magnets');
-}
-
-async function sendMagnets(magnets) {
-  if (state.sending || magnets.length === 0) return;
-  state.sending = true;
-  state.failedUrls = magnets.map(function (magnet) { return magnet.url; });
-  showView('main');
-  showActionWorkflow();
-  sendPageButton.disabled = false;
-  sendPageButton.setAttribute('aria-disabled', 'true');
-  sendButtonIcon.classList.add('hidden');
-  sendButtonSpinner.classList.remove('hidden');
-  sendButtonLabel.textContent = 'Sending ' + magnets.length + (magnets.length === 1 ? ' magnet...' : ' magnets...');
-  rescanButton.classList.add('hidden');
-  focusSoon(sendPageButton);
-
-  try {
-    var response = await browser.runtime.sendMessage({
-      type: 'send-page-magnets',
-      urls: magnets.map(function (magnet) { return magnet.url; })
-    });
-    if (!response || !response.ok) throw new Error((response && response.error) || 'TorBox could not process these magnets.');
-
-    var downloaded = 0;
-    var queued = 0;
-    var errors = 0;
-    for (var i = 0; i < response.results.length; i++) {
-      if (response.results[i].status === 'downloaded') downloaded++;
-      else if (response.results[i].status === 'queued') queued++;
-      else errors++;
-    }
-
-    var successful = downloaded + queued;
-    state.sending = false;
-    if (successful === 0) {
-      showSendError('TorBox could not process the selected ' + (magnets.length === 1 ? 'magnet.' : 'magnets.'));
-    } else {
-      state.failedUrls = [];
-      showSendResult(successful, magnets.length, downloaded, queued);
-      if (errors > 0) showToast(errors + (errors === 1 ? ' magnet failed' : ' magnets failed'), 'error');
-    }
-    await loadHistory();
-  } catch (error) {
-    state.sending = false;
-    showSendError(error.message || 'TorBox could not process these magnets.');
-  }
-}
-
-function showSendResult(successful, total, downloaded, queued) {
-  actionWorkflow.classList.add('hidden');
-  actionError.classList.add('hidden');
-  actionResult.classList.remove('hidden');
-  resultTitle.textContent = successful === total
-    ? (successful === 1 ? 'Magnet sent to TorBox' : successful + ' magnets sent to TorBox')
-    : successful + ' of ' + total + ' magnets sent';
-  var details = [];
-  if (downloaded) details.push(downloaded + ' ready to download');
-  if (queued) details.push(queued + ' queued');
-  resultDetail.textContent = details.join('  /  ');
-  focusSoon($('scan-again'));
-}
-
-function showSendError(message) {
-  actionWorkflow.classList.add('hidden');
-  actionResult.classList.add('hidden');
-  actionError.classList.remove('hidden');
-  actionErrorDetail.textContent = message;
-  focusSoon($('retry-send'));
 }
 
 async function loadHistory() {
@@ -430,7 +222,7 @@ function formatHistoryTime(timestamp) {
 function renderHistoryList(container, entries) {
   container.replaceChildren();
   if (!entries.length) {
-    container.appendChild(createElement('div', 'empty-state', 'Nothing here yet. Send a magnet from this page or use the right-click menu.'));
+    container.appendChild(createElement('div', 'empty-state', 'Nothing here yet. Right-click a magnet or .torrent link to start a download.'));
     return;
   }
 
@@ -442,13 +234,14 @@ function renderHistoryList(container, entries) {
     var primaryAction = entry.cached && entry.torrentId ? 'download' : 'dashboard';
     var primaryIcon = primaryAction === 'download' ? 'download' : 'grid';
     var primaryLabel = primaryAction === 'download' ? 'Download again' : 'Open TorBox dashboard';
-    var canShare = entry.hash || entry.torrentId;
+    var canCopyLink = Boolean(entry.torrentId);
     var canDelete = Boolean(entry.hash);
 
     var item = createElement('article', 'history-item');
     item.dataset.hash = entry.hash || '';
     item.dataset.torrentId = entry.torrentId || '';
     item.dataset.name = name;
+    item.dataset.zipWrap = entry.zipWrap === false ? 'false' : 'true';
 
     var content = createElement('div', 'history-content');
     var itemName = createElement('div', 'history-name', name);
@@ -465,7 +258,7 @@ function renderHistoryList(container, entries) {
 
     var actions = createElement('div', 'history-actions');
     actions.appendChild(createHistoryAction(primaryAction, primaryIcon, primaryLabel, false));
-    if (canShare) actions.appendChild(createHistoryAction('share', 'link', 'Copy share link', false));
+    if (canCopyLink) actions.appendChild(createHistoryAction('copy-link', 'link', 'Copy direct download link', false));
     if (canDelete) actions.appendChild(createHistoryAction('delete', 'close', 'Remove from history', true));
 
     item.appendChild(content);
@@ -502,20 +295,30 @@ async function handleHistoryClick(event) {
   var hash = item.dataset.hash;
   var torrentId = Number(item.dataset.torrentId || 0);
   var name = item.dataset.name || 'Magnet';
+  var zipWrap = item.dataset.zipWrap !== 'false';
 
   if (action === 'download' && torrentId) {
-    var downloadResult = await browser.runtime.sendMessage({ type: 're-download', torrentId: torrentId, name: name });
+    var downloadResult = await browser.runtime.sendMessage({ type: 're-download', torrentId: torrentId, name: name, zipWrap: zipWrap });
     showToast(downloadResult && downloadResult.ok ? 'Download starting' : 'Download could not start', downloadResult && downloadResult.ok ? '' : 'error');
   } else if (action === 'dashboard') {
     await browser.runtime.sendMessage({ type: 'open-dashboard' });
-  } else if (action === 'share') {
-    var shareResult = await browser.runtime.sendMessage({ type: 'copy-share-link', torrentId: torrentId, hash: hash });
-    showToast(shareResult && shareResult.ok ? 'Share link copied' : 'No share link available', shareResult && shareResult.ok ? '' : 'error');
+  } else if (action === 'copy-link' && torrentId) {
+    var link = buildDownloadLink(torrentId, state.apiKey, zipWrap);
+    if (!link) {
+      showToast('Direct download link unavailable', 'error');
+      return;
+    }
+    try {
+      await copyTextToClipboard(link);
+      showToast('Direct download link copied');
+    } catch (error) {
+      showToast('Direct download link could not be copied', 'error');
+    }
   } else if (action === 'delete' && hash) {
     await browser.runtime.sendMessage({ type: 'delete-history-entry', hash: hash });
     await loadHistory();
     if (state.activeView === 'history') focusSoon($('history-back'));
-    else focusSoon(recentHistory.querySelector('.history-action') || sendPageButton);
+    else focusSoon(recentHistory.querySelector('.history-action') || settingsToggle);
   }
 }
 
@@ -587,31 +390,6 @@ async function checkForUpdate(manual) {
   }
 }
 
-sendPageButton.addEventListener('click', function () {
-  if (state.scanning || state.sending) return;
-  if (state.magnets.length === 1) sendMagnets([state.magnets[0]]);
-  else if (state.magnets.length > 1) showMagnetPicker();
-});
-rescanButton.addEventListener('click', scanCurrentPage);
-$('scan-again').addEventListener('click', scanCurrentPage);
-$('retry-send').addEventListener('click', function () {
-  var retryMagnets = state.magnets.filter(function (magnet) { return state.failedUrls.indexOf(magnet.url) !== -1; });
-  sendMagnets(retryMagnets);
-});
-
-magnetList.addEventListener('change', updatePickerControls);
-selectAllButton.addEventListener('click', function () {
-  var inputs = magnetList.querySelectorAll('input');
-  var shouldSelect = magnetList.querySelectorAll('input:checked').length !== inputs.length;
-  for (var i = 0; i < inputs.length; i++) inputs[i].checked = shouldSelect;
-  updatePickerControls();
-});
-sendSelectedButton.addEventListener('click', function () { sendMagnets(selectedMagnets()); });
-$('picker-back').addEventListener('click', function () {
-  showView('main');
-  focusSoon(sendPageButton);
-});
-
 recentHistory.addEventListener('click', handleHistoryClick);
 fullHistory.addEventListener('click', handleHistoryClick);
 viewAllHistory.addEventListener('click', function () {
@@ -620,7 +398,7 @@ viewAllHistory.addEventListener('click', function () {
 });
 $('history-back').addEventListener('click', function () {
   showView('main');
-  focusSoon(viewAllHistory.classList.contains('hidden') ? sendPageButton : viewAllHistory);
+  focusSoon(viewAllHistory.classList.contains('hidden') ? settingsToggle : viewAllHistory);
 });
 
 saveKeyButton.addEventListener('click', saveApiKey);
@@ -632,6 +410,10 @@ setupBack.addEventListener('click', function () {
   focusSoon(settingsToggle);
 });
 connectionAlert.addEventListener('click', function () { showSetup(state.connected, 'Enter your API key to reconnect.'); });
+
+$('open-dashboard-top').addEventListener('click', function () {
+  browser.runtime.sendMessage({ type: 'open-dashboard' });
+});
 
 settingsToggle.addEventListener('click', function (event) {
   event.stopPropagation();
@@ -675,12 +457,9 @@ document.addEventListener('keydown', function (event) {
   if (event.key !== 'Escape') return;
   if (!confirmDialog.classList.contains('hidden')) hideClearConfirmation();
   else if (!settingsMenu.classList.contains('hidden')) closeSettings(true);
-  else if (state.activeView === 'picker') {
+  else if (state.activeView === 'history') {
     showView('main');
-    focusSoon(sendPageButton);
-  } else if (state.activeView === 'history') {
-    showView('main');
-    focusSoon(viewAllHistory.classList.contains('hidden') ? sendPageButton : viewAllHistory);
+    focusSoon(viewAllHistory.classList.contains('hidden') ? settingsToggle : viewAllHistory);
   } else if (state.activeView === 'connect' && state.connected) {
     showView('main');
     focusSoon(settingsToggle);

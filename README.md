@@ -1,16 +1,16 @@
 # TorBox Magnet
 
-A Firefox extension that sends magnet links directly to your [TorBox](https://torbox.app) account. Right-click any magnet link on a webpage and send it to TorBox with one click.
+A Firefox extension that sends magnet and `.torrent` links directly to your [TorBox](https://torbox.app) account and starts the download when it is ready.
 
 ## Features
 
-- **Right-click send** — Right-click any magnet link or .torrent file link → Send to TorBox
+- **Direct context-menu download** — Right-click any magnet link or `.torrent` file link → Send to TorBox and start download
 - **Smart archive detection** — Single `.rar`/`.7z`/`.zip` files download as-is; multi-file torrents bundle as `.zip`
 - **Cache-aware** — Cached torrents download immediately; uncached ones queue on TorBox servers
+- **Queued readiness notifications** — Queued torrents are checked every 30 seconds and notify once when ready
 - **Content type badges** — History shows file-type icons (archive, video, audio, image, doc, app)
-- **Download history** — Last 200 items with re-download, copy magnet link, and remove
-- **Copy magnet link** — Right-click any magnet link → Copy magnet link
-- **Send page magnets** — One-click send all unique magnet links on a page
+- **Download history** — Last 200 items with re-download, direct download link, and remove
+- **Direct links from history** — Copy a TorBox download link for an item from the popup history
 - **Lazy validation** — API key checked once per session, not every popup open
 - **Persistent profile** — Settings survive browser restarts
 - **TorBox-themed** — Dark glassmorphism UI with brand `#04bf8a` accent
@@ -101,7 +101,7 @@ torbox-magnet-firefox-addon/
   src/
     background.js        # Background script — API calls, context menus, history
     popup.html           # Popup UI — connect panel, history, settings drawer
-    popup.js             # Popup logic — lazy validation, history, file-type badges
+    popup.js             # Popup logic — lazy validation and history
     popup.css            # TorBox-themed glassmorphism design
     options.html         # (legacy — settings are inline in the popup)
     options.js           # (legacy)
@@ -116,8 +116,8 @@ This extension uses the [TorBox API](https://api.torbox.app/docs):
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/api/torrents/createtorrent` | Submit magnet link |
-| `POST /v1/api/torrents/checkcached` | Check cache status + list files |
-| `GET /v1/api/torrents/requestdl` | Download cached torrent as ZIP |
+| `GET /v1/api/torrents/checkcached` | Check cache status + list files |
+| `GET /v1/api/torrents/requestdl` | Request the direct download link |
 | `GET /v1/api/user/me` | Validate API key |
 
 ## License
