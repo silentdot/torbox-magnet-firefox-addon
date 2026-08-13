@@ -10,7 +10,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.3.1';
+var MANIFEST_VERSION = '1.3.2';
 var QUEUED_CHECK_ALARM = 'torbox-queued-check';
 var QUEUED_CHECK_PERIOD_MINUTES = 0.5;
 var queuedCheckInProgress = false;
@@ -412,6 +412,10 @@ async function handleMessage(msg) {
 
     case 'open-dashboard':
       browser.tabs.create({ url: 'https://torbox.app/dashboard' });
+      return { ok: true };
+
+    case 'open-update':
+      if (msg.url) browser.tabs.create({ url: msg.url, active: true });
       return { ok: true };
 
     case 'check-update-now':

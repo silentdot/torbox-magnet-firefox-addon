@@ -435,6 +435,12 @@ confirmDialog.addEventListener('click', function (event) {
   if (event.target === confirmDialog) hideClearConfirmation();
 });
 
+$('update-link').addEventListener('click', function (event) {
+  event.preventDefault();
+  if (this.href && this.href !== '#' && this.href !== location.href) {
+    browser.runtime.sendMessage({ type: 'open-update', url: this.href });
+  }
+});
 $('update-dismiss').addEventListener('click', function () {
   $('update-banner').classList.add('hidden');
   focusSoon(settingsToggle);
