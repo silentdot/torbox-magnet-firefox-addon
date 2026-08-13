@@ -10,7 +10,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.3.2';
+var MANIFEST_VERSION = '1.3.3';
 var QUEUED_CHECK_ALARM = 'torbox-queued-check';
 var QUEUED_CHECK_PERIOD_MINUTES = 0.5;
 var queuedCheckInProgress = false;
@@ -284,6 +284,7 @@ async function getHistory() {
 
 async function addHistory(entry) {
   var h = await getHistory();
+  entry.id = String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8);
   entry.timestamp = Date.now();
   h.unshift(entry);
   if (h.length > 200) h.length = 200;
@@ -340,9 +341,11 @@ async function clearHistory() {
   await browser.storage.local.set({ [HISTORY_KEY]: [] });
 }
 
-async function removeHistoryEntry(hash) {
+async function removeHistoryEntry(hash, id) {
   var h = await getHistory();
-  await browser.storage.local.set({ [HISTORY_KEY]: h.filter(function (e) { return e.hash !== hash; }) });
+  await browser.storage.local.set({
+    [HISTORY_KEY]: h.filter(function (e) { return id ? e.id !== id : e.hash !== hash; })
+  });
 }
 
 /* --- API Key Validation --- */
@@ -381,7 +384,7 @@ async function handleMessage(msg) {
       return { ok: true };
 
     case 'delete-history-entry':
-      await removeHistoryEntry(msg.hash);
+      await removeHistoryEntry(msg.hash, msg.id);
       return { ok: true };
 
     case 'refresh-history-cache': {

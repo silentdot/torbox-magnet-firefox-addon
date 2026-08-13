@@ -235,9 +235,10 @@ function renderHistoryList(container, entries) {
     var primaryIcon = primaryAction === 'download' ? 'download' : 'grid';
     var primaryLabel = primaryAction === 'download' ? 'Download again' : 'Open TorBox dashboard';
     var canCopyLink = Boolean(entry.torrentId);
-    var canDelete = Boolean(entry.hash);
+    var canDelete = true;
 
     var item = createElement('article', 'history-item');
+    item.dataset.id = entry.id || '';
     item.dataset.hash = entry.hash || '';
     item.dataset.torrentId = entry.torrentId || '';
     item.dataset.name = name;
@@ -292,6 +293,7 @@ async function handleHistoryClick(event) {
   if (!item) return;
 
   var action = button.dataset.historyAction;
+  var id = item.dataset.id;
   var hash = item.dataset.hash;
   var torrentId = Number(item.dataset.torrentId || 0);
   var name = item.dataset.name || 'Magnet';
@@ -314,8 +316,8 @@ async function handleHistoryClick(event) {
     } catch (error) {
       showToast('Direct download link could not be copied', 'error');
     }
-  } else if (action === 'delete' && hash) {
-    await browser.runtime.sendMessage({ type: 'delete-history-entry', hash: hash });
+  } else if (action === 'delete' && (hash || id)) {
+    await browser.runtime.sendMessage({ type: 'delete-history-entry', hash: hash, id: id });
     await loadHistory();
     if (state.activeView === 'history') focusSoon($('history-back'));
     else focusSoon(recentHistory.querySelector('.history-action') || settingsToggle);
