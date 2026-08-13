@@ -48,7 +48,7 @@ bg = bg.replace(/var MANIFEST_VERSION = '\d+\.\d+\.\d+'/, "var MANIFEST_VERSION 
 write('src/background.js', bg);
 
 var popup = read('src/popup.html');
-popup = popup.replace(/TorBox Magnet v\d+\.\d+\.\d+/, 'TorBox Magnet v' + newVer);
+popup = popup.replace(/(id="extension-version">)\d+\.\d+\.\d+/, '$1' + newVer);
 write('src/popup.html', popup);
 
 // --- 2. Build ---
