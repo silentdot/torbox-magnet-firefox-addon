@@ -1,6 +1,5 @@
 var API_KEY = 'torbox_api_key';
 var RECENT_HISTORY_LIMIT = 3;
-var DOWNLOAD_API_BASE = 'https://api.torbox.app/v1/api/torrents/requestdl';
 
 function $(id) { return document.getElementById(id); }
 function createIcon(name, size) {
@@ -90,12 +89,8 @@ function setKeyStatus(message, isError) {
   keyStatus.className = 'form-status' + (isError ? ' error' : '');
 }
 
-function buildDownloadLink(torrentId, apiKey, zipWrap) {
-  if (!torrentId || !apiKey) return '';
-  return DOWNLOAD_API_BASE + '?token=' + encodeURIComponent(apiKey) +
-    '&torrent_id=' + encodeURIComponent(torrentId) +
-    '&zip_link=' + (zipWrap ? 'true' : 'false') +
-    '&redirect=true&append_name=true';
+function buildDownloadLink(torrentId, apiKey, zipWrap, fileId) {
+  return DownloadLogic.buildDownloadLink(torrentId, apiKey, { zip: zipWrap, fileId: fileId });
 }
 
 function copyTextToClipboard(text) {
@@ -243,6 +238,8 @@ function renderHistoryList(container, entries) {
     item.dataset.torrentId = entry.torrentId || '';
     item.dataset.name = name;
     item.dataset.zipWrap = entry.zipWrap === false ? 'false' : 'true';
+    item.dataset.fileId = entry.fileId === undefined || entry.fileId === null ? '' : String(entry.fileId);
+    item.dataset.downloadFilename = entry.downloadFilename || '';
 
     var content = createElement('div', 'history-content');
     var itemName = createElement('div', 'history-name', name);
@@ -298,14 +295,16 @@ async function handleHistoryClick(event) {
   var torrentId = Number(item.dataset.torrentId || 0);
   var name = item.dataset.name || 'Magnet';
   var zipWrap = item.dataset.zipWrap !== 'false';
+  var fileId = item.dataset.fileId;
+  var downloadFilename = item.dataset.downloadFilename;
 
   if (action === 'download' && torrentId) {
-    var downloadResult = await browser.runtime.sendMessage({ type: 're-download', torrentId: torrentId, name: name, zipWrap: zipWrap });
+    var downloadResult = await browser.runtime.sendMessage({ type: 're-download', torrentId: torrentId, name: name, zipWrap: zipWrap, fileId: fileId || null, downloadFilename: downloadFilename });
     showToast(downloadResult && downloadResult.ok ? 'Download starting' : 'Download could not start', downloadResult && downloadResult.ok ? '' : 'error');
   } else if (action === 'dashboard') {
     await browser.runtime.sendMessage({ type: 'open-dashboard' });
   } else if (action === 'copy-link' && torrentId) {
-    var link = buildDownloadLink(torrentId, state.apiKey, zipWrap);
+    var link = buildDownloadLink(torrentId, state.apiKey, zipWrap, fileId || null);
     if (!link) {
       showToast('Direct download link unavailable', 'error');
       return;

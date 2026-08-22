@@ -10,7 +10,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.3.5';
+var MANIFEST_VERSION = '1.3.6';
 var QUEUED_CHECK_ALARM = 'torbox-queued-check';
 var QUEUED_CHECK_PERIOD_MINUTES = 0.5;
 var queuedCheckInProgress = false;
@@ -108,15 +108,9 @@ function isTorrentUrl(url) {
 
 /* --- Core: send to TorBox, returns {torrentId, name, hash}. --- */
 async function sendToTorbox(url, apiKey) {
-  var hash = '';
-  var name = '';
-
-  if (isMagnetUrl(url)) {
-    hash = extractHash(url);
-    name = extractNameFromMagnet(url) || 'Unknown';
-  } else {
-    name = extractFilename(url).replace(/\.torrent$/i, '') || 'Unknown';
-  }
+  var source = DownloadLogic.parseSource(url);
+  var hash = source.hash;
+  var name = source.name;
 
   var formData = new FormData();
   formData.append('allow_zip', 'true');
@@ -127,7 +121,7 @@ async function sendToTorbox(url, apiKey) {
     var fileRes = await fetch(url);
     if (!fileRes.ok) throw new Error('Failed to fetch .torrent (HTTP ' + fileRes.status + ')');
     var blob = await fileRes.blob();
-    formData.append('file', blob, extractFilename(url) || 'torrent.torrent');
+    formData.append('file', blob, source.uploadFilename);
   }
 
   var res = await fetch(API_BASE + '/torrents/createtorrent', {
@@ -148,7 +142,7 @@ async function sendToTorbox(url, apiKey) {
     throw new Error(data.detail || data.error || 'TorBox could not add the torrent (HTTP ' + res.status + ').');
   }
 
-  var torrentId = data.data && (data.data.torrent_id || data.data.id);
+  var torrentId = data.data && (data.data.torrentId || data.data.torrent_id || data.data.id);
   if (!torrentId) throw new Error('TorBox did not return a torrent ID.');
   if (data.data && data.data.name) name = data.data.name;
   if (data.data && data.data.hash) hash = data.data.hash;
@@ -179,13 +173,8 @@ async function findExistingTorrent(hash, apiKey) {
 }
 
 /* --- Build a direct TorBox download link --- */
-function buildDownloadLink(torrentId, apiKey, zipWrap) {
-  if (!torrentId || !apiKey) return '';
-  var params = 'token=' + encodeURIComponent(apiKey) +
-    '&torrent_id=' + encodeURIComponent(torrentId) +
-    '&zip_link=' + (zipWrap ? 'true' : 'false') +
-    '&redirect=true&append_name=true';
-  return API_BASE + '/torrents/requestdl?' + params;
+function buildDownloadLink(torrentId, apiKey, zipWrap, fileId) {
+  return DownloadLogic.buildDownloadLink(torrentId, apiKey, { zip: zipWrap, fileId: fileId });
 }
 
 /* --- Context Menu Handler --- */
@@ -211,8 +200,8 @@ browser.contextMenus.onClicked.addListener(async function (info) {
     if (rHash) {
       var cachedInfo = await checkCache(rHash, apiKey);
       if (cachedInfo.cached) {
-        var needsZip = needsZipWrap(cachedInfo.files, rName);
-        await startDownload(rId, apiKey, rName, url, rHash, needsZip);
+        var plan = await resolveDownloadPlan(rId, apiKey, rName, cachedInfo.files);
+        await startDownload(rId, apiKey, rName, url, rHash, plan.zip, false, plan.fileId, plan.filename);
         return;
       }
     }
@@ -248,34 +237,57 @@ async function checkCache(hash, apiKey) {
       }
     }
     if (!info) return { cached: false, files: [] };
-    var files = [];
-    if (Array.isArray(info.files)) {
-      for (var i = 0; i < info.files.length; i++) {
-        files.push(typeof info.files[i] === 'string' ? info.files[i] : (info.files[i].name || ''));
-      }
-    }
+    var files = DownloadLogic.normaliseFiles(info.files);
     return { cached: info.cached !== false, files: files };
   } catch (e) {
     return { cached: false, files: [] };
   }
 }
 
+async function getTorrentFiles(torrentId, apiKey) {
+  try {
+    var res = await fetch(API_BASE + '/torrents/mylist?bypass_cache=true&id=' + encodeURIComponent(torrentId), {
+      headers: { 'Authorization': 'Bearer ' + apiKey }
+    });
+    if (!res.ok) return [];
+    var data = await res.json();
+    var entries = data && data.data;
+    if (!Array.isArray(entries)) entries = entries ? [entries] : [];
+    for (var i = 0; i < entries.length; i++) {
+      if (String(entries[i].id || entries[i].torrent_id) === String(torrentId)) {
+        return DownloadLogic.normaliseFiles(entries[i].files);
+      }
+    }
+    return entries.length === 1 ? DownloadLogic.normaliseFiles(entries[0].files) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+async function resolveDownloadPlan(torrentId, apiKey, torrentName, cachedFiles) {
+  var files = DownloadLogic.normaliseFiles(cachedFiles);
+  if (files.length <= 1 && (!files[0] || files[0].id === null)) {
+    var torrentFiles = await getTorrentFiles(torrentId, apiKey);
+    if (torrentFiles.length) files = torrentFiles;
+  }
+  return DownloadLogic.createDownloadPlan(torrentName, files);
+}
+
 /* --- Start a direct browser download for a cached torrent --- */
-async function startDownload(torrentId, apiKey, name, url, hash, zipWrap, openInTab) {
-  var dlUrl = buildDownloadLink(torrentId, apiKey, zipWrap);
+async function startDownload(torrentId, apiKey, name, url, hash, zipWrap, openInTab, fileId, plannedFilename) {
+  var dlUrl = buildDownloadLink(torrentId, apiKey, zipWrap, fileId);
   if (!dlUrl) throw new Error('No direct download link available.');
+  var filename = plannedFilename || DownloadLogic.createDownloadPlan(name, zipWrap ? [] : [{ id: fileId, name: name }]).filename;
 
   if (openInTab) {
     await browser.tabs.create({ url: dlUrl });
   } else {
-    var ext = zipWrap ? '.zip' : '';
-    var filename = sanitiseFilename(name) + ext;
     var downloadOptions = { url: dlUrl };
     if (filename) downloadOptions.filename = filename;
     await browser.downloads.download(downloadOptions);
   }
 
-  await addHistory({ magnet: url, hash: hash, name: name, torrentId: torrentId, cached: true, zipWrap: zipWrap, fileType: 'other' });
+  await addHistory({ magnet: url, hash: hash, name: name, torrentId: torrentId, cached: true, zipWrap: zipWrap, fileId: fileId, downloadFilename: filename, fileType: 'other' });
   notify('Download Starting', (zipWrap ? 'ZIP ' : '') + 'Download started for "' + name + '".');
 }
 
@@ -320,7 +332,10 @@ async function checkQueuedTorrents(apiKey) {
       var hashKey = String(entry.hash).toLowerCase();
       var shouldNotify = !entry.readyNotified && !notifiedHashes[hashKey];
       entry.cached = true;
-      entry.zipWrap = needsZipWrap(cachedInfo.files, entry.name);
+      var plan = await resolveDownloadPlan(entry.torrentId, apiKey, entry.name, cachedInfo.files);
+      entry.zipWrap = plan.zip;
+      entry.fileId = plan.fileId;
+      entry.downloadFilename = plan.filename;
       entry.readyNotified = true;
       changed = true;
 
@@ -412,7 +427,10 @@ async function handleMessage(msg) {
     case 're-download': {
       var r = await browser.storage.local.get('torbox_api_key');
       if (!r.torbox_api_key) return { ok: false, error: 'No API key' };
-      await startDownload(msg.torrentId, r.torbox_api_key, msg.name, '', '', msg.zipWrap !== false, true);
+      var plan = msg.fileId !== undefined && msg.fileId !== null
+        ? DownloadLogic.createDownloadPlan(msg.name, [{ id: msg.fileId, name: msg.downloadFilename || msg.name }])
+        : await resolveDownloadPlan(msg.torrentId, r.torbox_api_key, msg.name, []);
+      await startDownload(msg.torrentId, r.torbox_api_key, msg.name, '', '', plan.zip, true, plan.fileId, plan.filename);
       return { ok: true };
     }
 
@@ -463,51 +481,6 @@ function detectFileType(files, name) {
     }
   }
   return 'other';
-}
-
-/* --- Archive Detection (zip-wrap logic) --- */
-var ARCHIVE_EXTS = FILE_TYPE_MAP[0].exts;
-
-function isArchiveFile(name) {
-  if (!name) return false;
-  var lower = name.toLowerCase();
-  for (var i = 0; i < ARCHIVE_EXTS.length; i++) {
-    if (lower.lastIndexOf(ARCHIVE_EXTS[i]) === lower.length - ARCHIVE_EXTS[i].length) return true;
-  }
-  return false;
-}
-
-function needsZipWrap(files, torrentName) {
-  if (!files || files.length === 0) return !isArchiveFile(torrentName);
-  if (files.length === 1) return !isArchiveFile(files[0]);
-  return true;
-}
-
-/* --- Helpers --- */
-function extractHash(magnet) {
-  var m = magnet.match(/btih:([a-fA-F0-9]{40}|[a-fA-F0-9]{64}|[A-Z2-7]{32})/);
-  return m ? m[1].toLowerCase() : '';
-}
-
-function extractNameFromMagnet(magnet) {
-  if (!magnet) return '';
-  var m = magnet.match(/[?&]dn=([^&]+)/);
-  if (!m) return '';
-  try { return decodeURIComponent(m[1].replace(/\+/g, ' ')); }
-  catch (e) { return ''; }
-}
-
-function extractFilename(url) {
-  if (!url) return '';
-  var u = url.split(/[?#]/)[0];
-  var parts = u.split('/');
-  var filename = parts[parts.length - 1] || '';
-  try { return decodeURIComponent(filename); }
-  catch (e) { return filename; }
-}
-
-function sanitiseFilename(s) {
-  return s.replace(/[<>:"/\\|?*]/g, '_').substring(0, 200);
 }
 
 function notify(title, message) {

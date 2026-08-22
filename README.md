@@ -15,6 +15,18 @@ A Firefox extension that sends magnet and `.torrent` links directly to your [Tor
 - **Persistent profile** — Settings survive browser restarts
 - **TorBox-themed** — Dark glassmorphism UI with brand `#04bf8a` accent
 
+## How it works
+
+1. You right-click a magnet or `.torrent` link and choose **Send to TorBox and start download**.
+2. The background script reads the API key from Firefox local storage. Magnet links go straight to TorBox. For a `.torrent` URL, the extension downloads the file first and uploads it to TorBox.
+3. TorBox returns a torrent ID. The extension checks whether the torrent is cached and reads its file list.
+4. A torrent with one file downloads that file directly with its TorBox file ID. A torrent with multiple files downloads as a ZIP. If TorBox has not returned enough file data to select one file, the extension uses a ZIP because the download endpoint requires either a file ID or a ZIP request.
+5. Before calling Firefox's download API, the extension removes path segments and characters that Firefox or Windows reject. Direct downloads use the real file name. ZIP downloads use the torrent name with one `.zip` extension.
+6. If the torrent is not ready, the extension saves it in local history and checks TorBox every 30 seconds. Once the files are ready, it records the download choice and shows a notification.
+7. The popup reads that local history. You can start the same download again, copy its TorBox link, open the TorBox dashboard, or remove the history entry.
+
+The API key and download history stay in Firefox local storage. Download data comes from TorBox and goes directly to Firefox's download manager; the extension does not proxy file contents through another server.
+
 ## Installation
 
 ### Quick start (development)

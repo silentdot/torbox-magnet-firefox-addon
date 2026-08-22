@@ -1,6 +1,6 @@
 {
   "name": "torbox-magnet",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "Send magnet and .torrent links directly to TorBox and start downloads.",
   "private": true,
   "scripts": {
