@@ -10,7 +10,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.3.4';
+var MANIFEST_VERSION = '1.3.5';
 var QUEUED_CHECK_ALARM = 'torbox-queued-check';
 var QUEUED_CHECK_PERIOD_MINUTES = 0.5;
 var queuedCheckInProgress = false;
@@ -261,16 +261,19 @@ async function checkCache(hash, apiKey) {
 }
 
 /* --- Start a direct browser download for a cached torrent --- */
-async function startDownload(torrentId, apiKey, name, url, hash, zipWrap) {
+async function startDownload(torrentId, apiKey, name, url, hash, zipWrap, openInTab) {
   var dlUrl = buildDownloadLink(torrentId, apiKey, zipWrap);
   if (!dlUrl) throw new Error('No direct download link available.');
 
-  var ext = zipWrap ? '.zip' : '';
-  var filename = sanitiseFilename(name) + ext;
-
-  var downloadOptions = { url: dlUrl };
-  if (filename) downloadOptions.filename = filename;
-  await browser.downloads.download(downloadOptions);
+  if (openInTab) {
+    await browser.tabs.create({ url: dlUrl });
+  } else {
+    var ext = zipWrap ? '.zip' : '';
+    var filename = sanitiseFilename(name) + ext;
+    var downloadOptions = { url: dlUrl };
+    if (filename) downloadOptions.filename = filename;
+    await browser.downloads.download(downloadOptions);
+  }
 
   await addHistory({ magnet: url, hash: hash, name: name, torrentId: torrentId, cached: true, zipWrap: zipWrap, fileType: 'other' });
   notify('Download Starting', (zipWrap ? 'ZIP ' : '') + 'Download started for "' + name + '".');
@@ -409,7 +412,7 @@ async function handleMessage(msg) {
     case 're-download': {
       var r = await browser.storage.local.get('torbox_api_key');
       if (!r.torbox_api_key) return { ok: false, error: 'No API key' };
-      await startDownload(msg.torrentId, r.torbox_api_key, msg.name, '', '', msg.zipWrap !== false);
+      await startDownload(msg.torrentId, r.torbox_api_key, msg.name, '', '', msg.zipWrap !== false, true);
       return { ok: true };
     }
 
