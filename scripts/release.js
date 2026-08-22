@@ -43,6 +43,10 @@ var manifest = JSON.parse(read('manifest.json'));
 manifest.version = newVer;
 write('manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 
+var packageJson = JSON.parse(read('package.json'));
+packageJson.version = newVer;
+write('package.json', JSON.stringify(packageJson, null, 2) + '\n');
+
 var bg = read('src/background.js');
 bg = bg.replace(/var MANIFEST_VERSION = '\d+\.\d+\.\d+'/, "var MANIFEST_VERSION = '" + newVer + "'");
 write('src/background.js', bg);

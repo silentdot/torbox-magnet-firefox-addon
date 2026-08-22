@@ -448,6 +448,11 @@ $('update-dismiss').addEventListener('click', function () {
   focusSoon(settingsToggle);
 });
 
+$('workflow-dismiss').addEventListener('click', function () {
+  $('workflow-panel').classList.add('hidden');
+  setStored('workflow_hidden', true);
+});
+
 document.addEventListener('keydown', function (event) {
   if (!confirmDialog.classList.contains('hidden') && event.key === 'Tab') {
     var dialogButtons = confirmDialog.querySelectorAll('button');
@@ -477,6 +482,7 @@ document.addEventListener('keydown', function (event) {
 (async function initialise() {
   var manifest = browser.runtime.getManifest();
   $('extension-version').textContent = manifest.version;
+  if (await getStored('workflow_hidden')) $('workflow-panel').classList.add('hidden');
   await initialiseApiKey();
   checkForUpdate(false);
 })();

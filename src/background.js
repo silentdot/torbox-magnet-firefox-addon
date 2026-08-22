@@ -10,7 +10,7 @@
 var API_BASE = 'https://api.torbox.app/v1/api';
 var HISTORY_KEY = 'torbox_history';
 var API_STATUS_KEY = 'torbox_api_status';
-var MANIFEST_VERSION = '1.3.3';
+var MANIFEST_VERSION = '1.3.4';
 var QUEUED_CHECK_ALARM = 'torbox-queued-check';
 var QUEUED_CHECK_PERIOD_MINUTES = 0.5;
 var queuedCheckInProgress = false;
@@ -266,7 +266,7 @@ async function startDownload(torrentId, apiKey, name, url, hash, zipWrap) {
   if (!dlUrl) throw new Error('No direct download link available.');
 
   var ext = zipWrap ? '.zip' : '';
-  var filename = ext ? sanitiseFilename(name) + ext : undefined;
+  var filename = sanitiseFilename(name) + ext;
 
   var downloadOptions = { url: dlUrl };
   if (filename) downloadOptions.filename = filename;

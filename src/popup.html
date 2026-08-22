@@ -100,11 +100,14 @@
           <span class="workflow-icon" aria-hidden="true">
             <svg width="19" height="19"><use href="#i-download"/></svg>
           </span>
-          <div>
+          <div class="workflow-body">
             <p class="eyebrow">Quick download</p>
             <h2 id="workflow-heading">Right-click a magnet or .torrent link</h2>
             <p class="workflow-description">Choose &quot;Send to TorBox and start download&quot; for a magnet link or .torrent file.</p>
           </div>
+          <button id="workflow-dismiss" class="plain-icon-button" type="button" aria-label="Hide instructions" title="Hide instructions">
+            <svg width="14" height="14" aria-hidden="true"><use href="#i-close"/></svg>
+          </button>
         </section>
 
         <section class="history-panel glass-panel" aria-labelledby="recent-heading">
@@ -156,7 +159,7 @@
         <svg width="16" height="16" aria-hidden="true"><use href="#i-trash"/></svg>
         Clear history
       </button>
-      <div class="settings-version">Version <span id="extension-version">1.3.3</span></div>
+      <div class="settings-version">Version <span id="extension-version">1.3.4</span></div>
     </div>
 
     <div id="confirm-dialog" class="dialog-layer hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-title">

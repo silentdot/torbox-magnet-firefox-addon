@@ -238,6 +238,16 @@ body {
   padding: 16px;
 }
 
+.workflow-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.workflow-panel .plain-icon-button {
+  flex: 0 0 auto;
+  margin: -4px -4px 0 0;
+}
+
 .section-heading, .focused-header {
   display: flex;
   align-items: center;

@@ -1,9 +1,10 @@
 {
   "name": "torbox-magnet",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Send magnet and .torrent links directly to TorBox and start downloads.",
   "private": true,
   "scripts": {
+    "test": "node --test",
     "dev": "web-ext run",
     "dev:firefox-dev": "web-ext run --firefox=firefoxdeveloperedition",
     "build": "web-ext build",

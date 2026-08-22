@@ -7,6 +7,7 @@ export default {
     '.gitignore',
     '*.md',
     'LICENSE',
+    'test/',
     '*.config.*',
     '.*'
   ],
